@@ -448,7 +448,7 @@ class MorfessorTokenizer(object):
                 yield item
 
     def _get_data_from_str(self, file_text):
-        """Return word count + segments tuples as a list for _extract_feature_set
+        """Return word count + init_segments tuples as a list for _extract_feature_set
 
         :param file_text:
         :return:
@@ -484,7 +484,7 @@ class MorfessorTokenizer(object):
 
         for word_tuple in segmentation_list:
 
-            # store word count, segments, and base form
+            # store word count, init_segments, and base form
             word_count, *segment_list = word_tuple
             word_base = ''.join(segment_list)
             word_base = re.sub(r'\+', '', word_base)
@@ -504,7 +504,7 @@ class MorfessorTokenizer(object):
                     temp_seg.append('+' + segment_list[-1])
                     segment_list = temp_seg
 
-            # get hypothesized root
+            # get hypothesized init_root
             # TODO: account for morphs of the same length
             # TODO: account for problem initials like 'nakaka-'
             morph_list = sorted(segment_list, key=len)
@@ -522,7 +522,7 @@ class MorfessorTokenizer(object):
 
         # store dictionaries in class variables
         _logger.info("Feature dictionary extracted.")
-        _logger.info("Morpheme, root, and token counters extracted.")
+        _logger.info("Morpheme, init_root, and token counters extracted.")
 
         self.feature_dict = feature_dict
         self.morph_counter = morph_counter
@@ -540,7 +540,7 @@ class MorfessorTokenizer(object):
         return self.morph_counter
 
     def get_roots(self):
-        """Return the root counter for the input file."""
+        """Return the init_root counter for the input file."""
 
         return self.root_counter
 
