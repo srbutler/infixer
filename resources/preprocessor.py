@@ -22,124 +22,49 @@ import logging
 import os
 import pickle
 import re
+import tempfile
 
 import morfessor
 
-from resources.segmenter import morfessor_main, make_temp_file
+from resources.segmenter import morfessor_main
 
 _logger = logging.getLogger(__name__)
 
 
-class AffixFilter(object):
-    """An object for filtering specified affixes from a list of words."""
-
-    def __init__(self, word_file, affix_list):
-
-        with open(word_file, 'r') as f:
-            self.word_list = f.readlines()
-
-        self.affixes = self._format_affixes(affix_list)
-        self.filtered_words = self._remove_affixes_from_words(self.word_list)
-
-    @staticmethod
-    def _make_group_pattern(regex):
-        """Build an appropriate group string for an affix regular expression."""
-
-        # TODO: write affix-removed tokens in such a way that the segmenter picks it up correctly
-        if regex.groups == 4:
-            out_str = r'\g<4><\g<2>><redup>'
-        else:
-            out_str = r'\g<1>\g<3><\g<2>>'
-
-        return out_str
-
-    def _format_affixes(self, affix_list):
-        """Reformat input affix patterns into something usable by the class.
-
-        - inputs: a list of regular expression defining affixes
-        - outputs: a list of tuples containing a compiled regular expression
-                   and a group pattern to preserve a word without that affix
-        """
-
-        affix_tuples = list()
-
-        for affix in affix_list:
-            regex_affix = re.compile(affix)
-            regex_repl = self._make_group_pattern(regex_affix)
-
-            # the regex plus the number of groups in it
-            affix_tuples.append((regex_affix, regex_repl))
-
-        return affix_tuples
-
-    def _remove_affixes_from_words(self, word_list):
-        """Cycle through each word and remove the affixes if present."""
-
-        filtered_words = list()
-
-        for word in word_list:
-
-            # return the same word unless one of the filters is applied
-            word_to_append = word
-
-            for affix_tuple in self.affixes:
-
-                affix_regex, affix_repl = affix_tuple
-
-                if affix_regex.search(word):
-
-                    # the affixes are mutually exclusive, if a filter matches,
-                    # the loop breaks and the word is sent to be appended
-
-                    word_to_append = affix_regex.sub(affix_repl, word)
-                    break
-
-            filtered_words.append(word_to_append)
-
-        return filtered_words
-
-    def filtered_words(self):
-        """Return list of filtered words to users."""
-
-        return self.filtered_words
-
-    def output_text(self, out_file):
-        """Write parsed words to a text file."""
-
-        out_list = self.filtered_words
-
-        with open(out_file, 'w') as f:
-            f.write(''.join(out_list))
-
-
 class ModelExaminer(object):
-    """An object that tokenizes a Morfessor model."""
+    """An object that pre-processes data for a Morfessor model."""
 
-    def __init__(self, baseline_obj):
-        """An object that tokenizes Morfessor model text files."""
+    def __init__(self, target, is_json_file=False):
+        """An object that pre-processes data for a Morfessor model."""
 
-        # for taking output from morfessor BaselineModel object in
-        # generator form
-        if isinstance(baseline_obj, morfessor.BaselineModel):
+        # set variables for progress tracking
+        self._cycle_init = True
+        self._cycle_test = False
+        self._cycle_final = False
+
+        # initialize variables for later assignment
+        self.word_changes = None
+        self.final_model = None
+
+        # builds initial feature dict from Morfessor Baseline object
+        if isinstance(target, morfessor.BaselineModel):
 
             # get the segmentation generator objects from the model
-            self._model_segments = baseline_obj.get_segmentations()
-            segments_for_analysis = self.flatten_segments(self._model_segments)
+            model_segments = target.get_segmentations()
+            segments_for_analysis = self.flatten_segments(model_segments)
 
             # extract the initial feature dictionary
             self._extract_feature_dict(segments_for_analysis)
 
-            # set variables for progress tracking
-            self._cycle_init = True
-            self._cycle_test = False
-            self._cycle_final = False
+        # builds initial feature dict from JSON file
+        elif is_json_file is True:
 
-            # initialize variable for later assignment
-            self.word_changes = None
+            # sets self._feature_dict from json file
+            self.load_init_json(target)
 
         else:
-            _logger.warning("Input not a Morfessor Baseline model, aborting")
-            raise ValueError("Input must be a Morfessor Baseline model")
+            _logger.warning("Input not valid, aborting")
+            raise ValueError("Input must be a Morfessor Baseline model or file")
 
     # ---------------------------- helper methods ----------------------------
 
@@ -161,15 +86,18 @@ class ModelExaminer(object):
     def make_group_pattern(regex):
         """Build an appropriate group string for an affix regular expression.
 
+        Morfessor's default force-split character is '-', so the rearranged morphemes
+        are separated with that in order to ensure correct segmentation.
+
         :param regex: regular expressions for an affix
         :return: a string containing the correct replacement form for the input regex
         """
 
         # TODO: write affix-removed tokens in such a way that the segmenter picks it up correctly
         if regex.groups == 4:
-            out_str = r'\g<4><\g<2>><redup>'
+            out_str = r'<redup>-<\g<2>>-\g<4>'
         else:
-            out_str = r'\g<1>\g<3><\g<2>>'
+            out_str = r'<\g<2>>-\g<1>\g<3>'
 
         return out_str
 
@@ -183,8 +111,11 @@ class ModelExaminer(object):
         """
 
         # TODO: ensure make_temp_file works when this object is imported into a script
-        container_file = make_temp_file()
-        container_file.write('\n'.join(train_words))
+        temp_dir = tempfile.TemporaryDirectory()
+        container_file = os.path.join(temp_dir.name, 'tempfile.txt')
+
+        with open(container_file, 'w') as f:
+            f.write('\n'.join(train_words))
 
         # input file must always be a list! the call fails otherwise
         # TODO: ensure morfessor_main works when this object is imported into a script
@@ -217,8 +148,8 @@ class ModelExaminer(object):
         :type run_cycle: int for which cycle the analysis project is being called
         """
 
-        # build dictionary of words and features
-        feature_dict = dict()
+        # set a default dict with default arg as an empty dictionary
+        feature_dict = collections.defaultdict(dict)
 
         for word_tuple in segmentation_list:
 
@@ -239,17 +170,18 @@ class ModelExaminer(object):
                 temp_seg.append('+' + segment_list[-1])
                 segment_list = temp_seg
 
-            # get hypothesized init_root
+            # get hypothesized init_root, remove its '+'
             # TODO: account for morphs of the same length
             # TODO: account for problem prefixes like 'nakaka-'
             morph_list = sorted(segment_list, key=len)
-            word_root = morph_list.pop()
+            word_root = morph_list.pop().replace('+', '')
 
             # for the __init__ cycle
             if run_cycle == 1:
 
                 # construct the initial dictionary
                 feature_dict[word_base] = dict(count=word_count,
+                                               init_word_base=word_base,
                                                init_segments=segment_list,
                                                init_root=word_root)
 
@@ -265,10 +197,17 @@ class ModelExaminer(object):
                 # set marker for completion
                 self._cycle_test = True
 
+            elif run_cycle == 3:
+
+                self._feature_dict[word_base]['final_segments'] = segment_list
+                self._feature_dict[word_base]['final_root'] = word_root
+
         if run_cycle == 1:
             _logger.info("Feature dictionary extracted.")
         elif run_cycle == 2:
             _logger.info("Feature dictionary updated with test values.")
+        elif run_cycle == 3:
+            _logger.info("Feature dictionary updated with final values.")
 
     def _get_init_roots(self):
         """Get Counter for all values of init_root from the feature dictionary."""
@@ -320,23 +259,25 @@ class ModelExaminer(object):
 
         return affix_tuples
 
-    def filter_affixes(self, affix_list):
+    def filter_affixes(self, affixes):
         """Cycle through each word and remove the affixes if present.
 
-        :param affix_list: a list of regular expression defining affixes
+        :param affixes: a list of regular expression defining affixes
         """
 
         # test to ensure this cycle is completed
         if self._cycle_test is False:
 
+            affixes_formatted = self._format_affixes(affixes)
+
             for word in self._feature_dict:
 
-                for affix_tuple in affix_list:
+                for affix_tuple in affixes_formatted:
 
                     # unpack return from _format_affixes
                     affix_regex, affix_repl, has_redup, affix_form = affix_tuple
 
-                    _logger.info("Testing affix: '{}'".format(affix_regex.pattern))
+                    _logger.debug("Testing affix '{}' on word '{}'".format(affix_regex.pattern, word))
 
                     if affix_regex.search(word):
 
@@ -368,12 +309,18 @@ class ModelExaminer(object):
         retrain_words = list()
         original_transformed_map = dict()
 
+        # determine lookup based on phase so this method can be reused
+        if self._cycle_final is True:
+            lookup_feature = 'final_word_base'
+        else:
+            lookup_feature = 'test_transformed'
+
         for word in self._feature_dict:
 
             # if transformed exists, append it to retrain_words and add a dict entry
-            if self._feature_dict[word].get('test_transformed', None):
+            if self._feature_dict[word].get(lookup_feature, None):
 
-                transformed = self._feature_dict[word]['test_transformed']
+                transformed = self._feature_dict[word][lookup_feature]
                 original_transformed_map[transformed] = word
                 retrain_words.append(transformed)
 
@@ -389,22 +336,27 @@ class ModelExaminer(object):
         """
 
         counter = 0
+        if self._cycle_final is True:
+            feature_keys = ['final_root', 'final_segments']
+            cycle_name = 'FINAL CYCLE'
+        else:
+            # TODO: insert feature keys from third part of __init__ recall
+            feature_keys = ['test_infix', 'test_has_redup', 'test_transformed', 'test_segments', 'test_root']
+            cycle_name = 'TEST CYCLE'
 
-        for word in self._feature_dict:
+        # temporary dictionary to prevent RuntimeErrors due to dictionary changing size
+        feature_dict_copy = self._feature_dict.copy()
+
+        for word in feature_dict_copy:
 
             # checks to see if key is in _get_retrain_words output
             if word in transformed_original_dict.keys():
 
                 base_form = transformed_original_dict[word]
                 transformed_values = self._feature_dict.get(word)
-                test_values = ['test_infix',
-                               'test_has_redup',
-                               'test_transformed',
-                               'test_segments',
-                               'test_root']
 
                 # moves the values from the second cycle into the correct _feature_dict entry
-                for val in test_values:
+                for val in feature_keys:
 
                     # prevent overwriting extant values with None
                     dict_val = transformed_values.get(val, None)
@@ -417,7 +369,7 @@ class ModelExaminer(object):
 
                 counter += 1
 
-        _logger.info('{} word forms rebuilt in the feature dictionary.'.format(counter))
+        _logger.info('{}: {} word forms rebuilt in the feature dictionary.'.format(cycle_name, counter))
 
     def build_test_model(self, dampening='none'):
         """Run the Morfessor Baseline model on the transformed data.
@@ -437,6 +389,7 @@ class ModelExaminer(object):
         words_for_retraining, transformed_mapping = self._get_retrain_words()
 
         # train model and get segmentations
+        _logger.info("TEST CYCLE: training Morfessor Baseline model")
         model = self._train_morfessor_model(words_for_retraining, dampening)
         segments = model.get_segmentations()
 
@@ -471,10 +424,11 @@ class ModelExaminer(object):
         for word in self._feature_dict:
 
             test_root = self._feature_dict[word].get('test_root', None)
+            test_transformed = self._feature_dict[word].get('test_transformed', None)
 
-            if test_root is not None:
-
-                test_root_count = init_roots[test_root]
+            # only words with a found affix have a test_transformed feature
+            if test_transformed is not None:
+                test_root_count = init_roots.get(test_root, 0)
                 self._feature_dict[word]['test_root_count'] = test_root_count
                 self._feature_dict[word]['test_root_per'] = test_root_count / roots_sum
 
@@ -491,10 +445,11 @@ class ModelExaminer(object):
 
         # TODO: consider putting in a feature that cancels any alteration
 
-        word_changes = list()
+        changed_words = list()
 
         for word in self._feature_dict:
 
+            _logger.debug("Processing word: '{}'".format(word))
             features = self._feature_dict[word]
 
             # TODO: reduce redundancy in this nested if
@@ -505,41 +460,30 @@ class ModelExaminer(object):
                     new_word_base = features['test_transformed']
                     self._feature_dict[word]['final_word_base'] = new_word_base
 
-                    word_changes.append((word, new_word_base))
+                    changed_words.append((word, new_word_base))
 
-                    _logger.debug("CHANGE: '{}' changed to '{}'".format(word, new_word_base))
+                    _logger.debug("TRAINING WORD CHANGED: '{}' changed to '{}'".format(word, new_word_base))
 
                 else:
-                    old_word_base = features['word_base']
-                    self._feature_dict[word]['final_word_base'] = old_word_base
-
-                    word_changes.append(old_word_base)
-
-                    _logger.debug("NO CHANGE: '{}'".format(word))
+                    _logger.debug("TRAINING WORD UNCHANGED: '{}'".format(word))
 
             else:
+                _logger.debug("NO CHANGE NEEDED: '{}'".format(word))
 
-                old_word_base = features['word_base']
-                self._feature_dict[word]['final_word_base'] = old_word_base
+        unchanged_words = len(list(self._feature_dict)) - len(changed_words)
+        _logger.info("{} tokens changed, {} tokens unchanged".format(len(changed_words), unchanged_words))
 
-                word_changes.append(old_word_base)
+        self.word_changes = changed_words
 
-                _logger.debug("NO CHANGE: '{}'".format(word))
-
-        # get counts of changes for log
-        changed_words = sum([1 for item in word_changes if isinstance(item, tuple)])
-        unchanged_words = sum([1 for item in word_changes if isinstance(item, str)])
-
-        _logger.info("{} tokens changed, {} tokens unchanged".format(changed_words, unchanged_words))
-
-        self.word_changes = word_changes
-
-    def build_final_model(self, threshold=0, out_file=None):
-        """Set the token forms for the final model using thresholds.
+    def build_final_model(self, dampening='none', threshold=0):
+        """Build the final model using the transformed and tested word list.
 
         :param threshold: default=0; lower bound on whether transformed form should be used in final model
-        :param out_file: if present, writes filtered tokens and their change status to a text file
+        :param dampening: model dampening type in {'none', 'ones', 'log'}
         """
+
+        # set tracker variable
+        self._cycle_final = True
 
         # sets up test_root counts and percents
         self._set_retrain_values()
@@ -547,19 +491,63 @@ class ModelExaminer(object):
         # determines final training values based on threshold
         self._assign_final_values(threshold)
 
-        # write token set (with changed valued noted) to a file for inspection
-        if out_file:
-            self.write_changed_tokens(out_file)
+        # get training word set and key for remapping after the cycle
+        final_word_list, transformed_mapping = self._get_retrain_words()
 
-    def get_final_model(self, dampening='none'):
-        """Build the final model using the transformed and tested word list.
+        # train model and get segmentations
+        _logger.info("FINAL CYCLE: training Morfessor Baseline model")
+        self.final_model = self._train_morfessor_model(final_word_list, dampening)
+        segments = self.final_model.get_segmentations()
 
-        :param dampening: model dampening type in {'none', 'ones', 'log'}
-        """
+        # re-runs the __init__ cycle, but updates with final values instead
+        segments_for_analysis = self.flatten_segments(segments)
+        self._extract_feature_dict(segments_for_analysis, run_cycle=3)
 
-        final_word_list = [self._feature_dict[word]['final_word_base'] for word in self._feature_dict]
+        # repair self._feature_dict and correctly maps new values to right keys
+        self._rebuild_original_wordforms(transformed_mapping)
 
-        return self._train_morfessor_model(final_word_list, dampening)
+    def get_final_model(self):
+
+        return self.final_model
+
+    # ---------------------------- loading methods ---------------------------
+
+    @staticmethod
+    def _load_json_dict(in_file):
+        """Build a defaultdict from a JSON input file."""
+
+        with open(in_file, 'r') as f:
+            json_dict = json.load(f)
+
+        json_defdict = collections.defaultdict(dict, json_dict)
+
+        _logger.info("Feature dictionary loaded from '{}'".format(in_file))
+
+        return json_defdict
+
+    def load_init_json(self, in_file):
+
+        self._feature_dict = self._load_json_dict(in_file)
+
+        self._cycle_init = True
+        self._cycle_test = False
+        self._cycle_final = False
+
+    def load_test_json(self, in_file):
+
+        self._feature_dict = self._load_json_dict(in_file)
+
+        self._cycle_init = True
+        self._cycle_test = True
+        self._cycle_final = False
+
+    def load_final_json(self, in_file):
+
+        self._feature_dict = self._load_json_dict(in_file)
+
+        self._cycle_init = True
+        self._cycle_test = True
+        self._cycle_final = True
 
     # ---------------------------- output methods ----------------------------
 
@@ -601,12 +589,7 @@ class ModelExaminer(object):
 
         with open(out_file, 'w') as f:
             for item in self.word_changes:
-
-                if isinstance(item, tuple):
-                    f.write('{}\t\t{}'.format(item[0], item[1]))
-
-                else:
-                    f.write(item)
+                f.write('{}\t{}\n'.format(item[0], item[1]))
 
         out_name = os.path.basename(out_file)
         _logger.info("Word changes list written to {}".format(out_name))
