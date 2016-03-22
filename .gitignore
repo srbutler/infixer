@@ -3,9 +3,8 @@
 
 ## local project directories and files
 output/
-wordlists/
-test_bed.py
-
+preprocessing_test.py
+tokenization_test.py
 
 *.iml
 
