@@ -26,12 +26,115 @@ import tempfile
 
 import morfessor
 
-from resources.segmenter import morfessor_main
+# from resources.segmenter import morfessor_main, make_temp_file
+from segmenter import morfessor_main
 
 _logger = logging.getLogger(__name__)
 
 
-class ModelExaminer(object):
+class AffixFilter(object):
+
+    def __init__(self, affix_list):
+
+        self.affix_list = affix_list
+
+    @staticmethod
+    def make_group_pattern(regex):
+        """Build an appropriate group string for an affix regular expression.
+
+        Morfessor's default force-split character is '-', so the rearranged morphemes
+        are separated with that in order to ensure correct segmentation.
+
+        :param regex: regular expressions for an affix
+        :return: a string containing the correct replacement form for the input regex
+        """
+
+        # TODO: write affix-removed tokens in such a way that the segmenter
+        # picks it up correctly
+        if regex.groups == 4:
+            out_str = r'<redup>-<\g<2>>-\g<4>'
+        else:
+            out_str = r'<\g<2>>-\g<1>\g<3>'
+
+        return out_str
+
+    def _format_affixes(self, affix_list):
+        """Reformat input affix patterns into something usable by the class.
+
+        :param affix_list: a list of regular expression defining affixes
+        :return: a list of tuples containing a compiled regular expression
+                 and a group pattern to preserve a word without that affix
+        """
+
+        # TODO: make this method applicable to more languages than Tagalog
+
+        affix_tuples = list()
+
+        for affix in affix_list:
+
+            # compiled regular expression
+            regex_affix = re.compile(affix)
+
+            # replacement form, using customizable method
+            regex_repl = self.make_group_pattern(regex_affix)
+
+            # whether reduplication tag exists
+            has_redup = True if re.search('redup', regex_affix.pattern) else False
+
+            # orthographic form of the infix/affix
+            affix_form = re.search('\W*?(\w+)\W*', regex_affix.pattern).group(1)
+
+            # return all as a 4-tuple
+            affix_tuples.append(
+                (regex_affix, regex_repl, has_redup, affix_form))
+
+        return affix_tuples
+
+    def filter_affixes(self, affixes):
+        """Cycle through each word and remove the affixes if present.
+
+        :param affixes: a list of regular expression defining affixes
+        """
+
+        self.affix_list = affixes
+
+        # test to ensure this cycle is completed
+        if self._cycle_test is False:
+
+            affixes_formatted = self._format_affixes(affixes)
+
+            for word in self._feature_dict:
+
+                for affix_tuple in affixes_formatted:
+
+                    # unpack return from _format_affixes
+                    affix_regex, affix_repl, has_redup, affix_form = affix_tuple
+
+                    _logger.debug("Testing affix '{}' on word '{}'".format(
+                        affix_regex.pattern, word))
+
+                    if affix_regex.search(word):
+
+                        # the affixes are mutually exclusive, if a filter matches,
+                        # the loop breaks and the word is sent to be appended
+                        # TODO: make this more generally applicable
+
+                        self._feature_dict[word]['test_infix'] = affix_form
+                        self._feature_dict[word]['test_has_redup'] = has_redup
+                        self._feature_dict[word][
+                            'test_transformed'] = affix_regex.sub(affix_repl, word)
+
+                        break
+
+            _logger.info("Feature dictionary updated with affix testing.")
+
+        else:
+
+            _logger.warning(
+                "Method 'filter_affixes' cannot be called a second time.")
+
+
+class ModelBuilder(object):
     """An object that pre-processes data for a Morfessor model."""
 
     def __init__(self, target, is_json_file=False):
@@ -43,7 +146,8 @@ class ModelExaminer(object):
         self._cycle_final = False
 
         # initialize variables for later assignment
-        self.word_changes = None
+        self.affix_list = []
+        self.word_changes = []
         self.final_model = None
 
         # builds initial feature dict from Morfessor Baseline object
@@ -93,7 +197,8 @@ class ModelExaminer(object):
         :return: a string containing the correct replacement form for the input regex
         """
 
-        # TODO: write affix-removed tokens in such a way that the segmenter picks it up correctly
+        # TODO: write affix-removed tokens in such a way that the segmenter
+        # picks it up correctly
         if regex.groups == 4:
             out_str = r'<redup>-<\g<2>>-\g<4>'
         else:
@@ -102,7 +207,7 @@ class ModelExaminer(object):
         return out_str
 
     @staticmethod
-    def _train_morfessor_model(train_words, dampening='none'):
+    def _train_morfessor_model(train_words, dampening='none', cycle='test', save_file=None):
         """Call the Morfessor Baseline model main on the supplied word list.
 
         :param train_words: an iterable containing word strings for retraining
@@ -110,7 +215,8 @@ class ModelExaminer(object):
         :return:
         """
 
-        # TODO: ensure make_temp_file works when this object is imported into a script
+        # TODO: ensure make_temp_file works when this object is imported into a
+        # script
         temp_dir = tempfile.TemporaryDirectory()
         container_file = os.path.join(temp_dir.name, 'tempfile.txt')
 
@@ -118,8 +224,9 @@ class ModelExaminer(object):
             f.write('\n'.join(train_words))
 
         # input file must always be a list! the call fails otherwise
-        # TODO: ensure morfessor_main works when this object is imported into a script
-        model = morfessor_main([container_file], dampening)
+        # TODO: ensure morfessor_main works when this object is imported into a
+        # script
+        model = morfessor_main([container_file], dampening, cycle, save_file)
 
         return model
 
@@ -212,7 +319,8 @@ class ModelExaminer(object):
     def _get_init_roots(self):
         """Get Counter for all values of init_root from the feature dictionary."""
 
-        roots_list = [self._feature_dict[word]['init_root'] for word in self._feature_dict]
+        roots_list = [self._feature_dict[word]['init_root']
+                      for word in self._feature_dict]
 
         return collections.Counter(roots_list)
 
@@ -255,7 +363,8 @@ class ModelExaminer(object):
             affix_form = re.search('\W*?(\w+)\W*', regex_affix.pattern).group(1)
 
             # return all as a 4-tuple
-            affix_tuples.append((regex_affix, regex_repl, has_redup, affix_form))
+            affix_tuples.append(
+                (regex_affix, regex_repl, has_redup, affix_form))
 
         return affix_tuples
 
@@ -264,6 +373,8 @@ class ModelExaminer(object):
 
         :param affixes: a list of regular expression defining affixes
         """
+
+        self.affix_list = affixes
 
         # test to ensure this cycle is completed
         if self._cycle_test is False:
@@ -277,7 +388,8 @@ class ModelExaminer(object):
                     # unpack return from _format_affixes
                     affix_regex, affix_repl, has_redup, affix_form = affix_tuple
 
-                    _logger.debug("Testing affix '{}' on word '{}'".format(affix_regex.pattern, word))
+                    _logger.debug("Testing affix '{}' on word '{}'".format(
+                        affix_regex.pattern, word))
 
                     if affix_regex.search(word):
 
@@ -287,7 +399,8 @@ class ModelExaminer(object):
 
                         self._feature_dict[word]['test_infix'] = affix_form
                         self._feature_dict[word]['test_has_redup'] = has_redup
-                        self._feature_dict[word]['test_transformed'] = affix_regex.sub(affix_repl, word)
+                        self._feature_dict[word][
+                            'test_transformed'] = affix_regex.sub(affix_repl, word)
 
                         break
 
@@ -295,7 +408,8 @@ class ModelExaminer(object):
 
         else:
 
-            _logger.warning("Method 'filter_affixes' cannot be called a second time.")
+            _logger.warning(
+                "Method 'filter_affixes' cannot be called a second time.")
 
     def _get_retrain_words(self):
         """Get right words for retrain and a dict with transformed-to-original mapping.
@@ -317,7 +431,8 @@ class ModelExaminer(object):
 
         for word in self._feature_dict:
 
-            # if transformed exists, append it to retrain_words and add a dict entry
+            # if transformed exists, append it to retrain_words and add a dict
+            # entry
             if self._feature_dict[word].get(lookup_feature, None):
 
                 transformed = self._feature_dict[word][lookup_feature]
@@ -341,10 +456,12 @@ class ModelExaminer(object):
             cycle_name = 'FINAL CYCLE'
         else:
             # TODO: insert feature keys from third part of __init__ recall
-            feature_keys = ['test_infix', 'test_has_redup', 'test_transformed', 'test_segments', 'test_root']
+            feature_keys = ['test_infix', 'test_has_redup',
+                            'test_transformed', 'test_segments', 'test_root']
             cycle_name = 'TEST CYCLE'
 
-        # temporary dictionary to prevent RuntimeErrors due to dictionary changing size
+        # temporary dictionary to prevent RuntimeErrors due to dictionary
+        # changing size
         feature_dict_copy = self._feature_dict.copy()
 
         for word in feature_dict_copy:
@@ -355,7 +472,8 @@ class ModelExaminer(object):
                 base_form = transformed_original_dict[word]
                 transformed_values = self._feature_dict.get(word)
 
-                # moves the values from the second cycle into the correct _feature_dict entry
+                # moves the values from the second cycle into the correct
+                # _feature_dict entry
                 for val in feature_keys:
 
                     # prevent overwriting extant values with None
@@ -371,7 +489,7 @@ class ModelExaminer(object):
 
         _logger.info('{}: {} word forms rebuilt in the feature dictionary.'.format(cycle_name, counter))
 
-    def build_test_model(self, dampening='none'):
+    def build_test_model(self, dampening='none', cycle='test', save_file=None):
         """Run the Morfessor Baseline model on the transformed data.
 
         This method creates a second model, modified from the first, where the
@@ -390,7 +508,7 @@ class ModelExaminer(object):
 
         # train model and get segmentations
         _logger.info("TEST CYCLE: training Morfessor Baseline model")
-        model = self._train_morfessor_model(words_for_retraining, dampening)
+        model = self._train_morfessor_model(words_for_retraining, dampening, cycle, save_file)
         segments = model.get_segmentations()
 
         # re-runs the __init__ cycle, but updates with test values instead
@@ -424,15 +542,18 @@ class ModelExaminer(object):
         for word in self._feature_dict:
 
             test_root = self._feature_dict[word].get('test_root', None)
-            test_transformed = self._feature_dict[word].get('test_transformed', None)
+            test_transformed = self._feature_dict[
+                word].get('test_transformed', None)
 
             # only words with a found affix have a test_transformed feature
             if test_transformed is not None:
+
                 test_root_count = init_roots.get(test_root, 0)
                 self._feature_dict[word]['test_root_count'] = test_root_count
                 self._feature_dict[word]['test_root_per'] = test_root_count / roots_sum
 
-        _logger.debug('Counts and percents set for roots after training with transformed forms.')
+        _logger.debug(
+            'Counts and percents set for roots after training with transformed forms.')
 
     def _assign_final_values(self, threshold=0):
         """Assigns the final versions of roots and segmentations using retrain values.
@@ -462,7 +583,8 @@ class ModelExaminer(object):
 
                     changed_words.append((word, new_word_base))
 
-                    _logger.debug("TRAINING WORD CHANGED: '{}' changed to '{}'".format(word, new_word_base))
+                    _logger.debug("TRAINING WORD CHANGED: '{}' changed to '{}'".format(
+                        word, new_word_base))
 
                 else:
                     _logger.debug("TRAINING WORD UNCHANGED: '{}'".format(word))
@@ -471,11 +593,12 @@ class ModelExaminer(object):
                 _logger.debug("NO CHANGE NEEDED: '{}'".format(word))
 
         unchanged_words = len(list(self._feature_dict)) - len(changed_words)
-        _logger.info("{} tokens changed, {} tokens unchanged".format(len(changed_words), unchanged_words))
+        _logger.info("{} tokens changed, {} tokens unchanged".format(
+            len(changed_words), unchanged_words))
 
         self.word_changes = changed_words
 
-    def build_final_model(self, dampening='none', threshold=0):
+    def build_final_model(self, dampening='none', threshold=0, cycle='final', save_file=None):
         """Build the final model using the transformed and tested word list.
 
         :param threshold: default=0; lower bound on whether transformed form should be used in final model
@@ -496,7 +619,7 @@ class ModelExaminer(object):
 
         # train model and get segmentations
         _logger.info("FINAL CYCLE: training Morfessor Baseline model")
-        self.final_model = self._train_morfessor_model(final_word_list, dampening)
+        self.final_model = self._train_morfessor_model(final_word_list, dampening, cycle, save_file)
         segments = self.final_model.get_segmentations()
 
         # re-runs the __init__ cycle, but updates with final values instead
@@ -505,10 +628,6 @@ class ModelExaminer(object):
 
         # repair self._feature_dict and correctly maps new values to right keys
         self._rebuild_original_wordforms(transformed_mapping)
-
-    def get_final_model(self):
-
-        return self.final_model
 
     # ---------------------------- loading methods ---------------------------
 
@@ -556,6 +675,10 @@ class ModelExaminer(object):
 
         return self._feature_dict
 
+    def get_final_model(self):
+
+        return self.final_model
+
     def write_feature_dict(self, out_file, output_format):
         """Write feature set to output format (JSON).
 
@@ -564,7 +687,8 @@ class ModelExaminer(object):
         """
 
         if output_format.lower() not in {'json', 'pickle'}:
-            _logger.error('ERROR: unrecognized output format: {}'.format(output_format))
+            _logger.error(
+                'ERROR: unrecognized output format: {}'.format(output_format))
             raise ValueError("output_format: {'json', 'pickle'}")
 
         elif output_format.lower() == 'json':
@@ -578,7 +702,8 @@ class ModelExaminer(object):
                 pickle.dump(self._feature_dict, f)
 
         out_name = os.path.basename(out_file)
-        out_msg = "Feature set dictionary written to {}".format(out_name + '.' + output_format.lower())
+        out_msg = "Feature set dictionary written to {}".format(
+            out_name + '.' + output_format.lower())
         _logger.info(out_msg)
 
     def write_changed_tokens(self, out_file):
