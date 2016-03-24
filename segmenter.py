@@ -1,6 +1,8 @@
+
 import logging
 import math
 import os
+import string
 import sys
 import tempfile
 import time
@@ -12,17 +14,6 @@ from morfessor.io import MorfessorIO
 PY3 = sys.version_info.major == 3
 
 _logger = logging.getLogger(__name__)
-
-
-def make_temp_file():
-    """Create a temporary file that can be written to, for model input"""
-
-    # write to temporary file for model output
-    # TODO: see if this workaround can be improved at all
-    temp_dir = tempfile.TemporaryDirectory()
-    temp_file = os.path.join(temp_dir.name, 'tempfile.txt')
-
-    return temp_file
 
 
 def morfessor_main_complete(train_files, dampening):
@@ -62,7 +53,8 @@ def morfessor_main_complete(train_files, dampening):
     """
 
     # define input variables normally input at command line
-    # all arguments are equal to their args.item equivalent in original script's main()
+    # all arguments are equal to their args.item equivalent in original
+    # script's main()
 
     trainfiles = train_files    # input files for training
     progress = True             # show progress bar
@@ -72,12 +64,17 @@ def morfessor_main_complete(train_files, dampening):
     lowercase = False           # makes all inputs lowercase
     forcesplit = ['-']          # list of chars to force a split on
     corpusweight = 1.0          # load annotation data for tuning the corpus weight param
-    skips = False               # use random skips for frequently seen compounds to speed up training
-    nosplit = None              # if the expression matches the two surrounding characters, do not allow splitting
+    # use random skips for frequently seen compounds to speed up training
+    skips = False
+    # if the expression matches the two surrounding characters, do not allow
+    # splitting
+    nosplit = None
     dampening = dampening       # 'none', 'ones', or 'log'
     algorithm = 'recursive'     # 'recursive' or 'viterbi'
-    trainmode = 'online+batch'  # 'none', 'batch', 'init', 'init+batch', 'online', 'online+batch'
-    finish_threshold = 0.005    # train stops when the improvement of last iteration is smaller than this
+    # 'none', 'batch', 'init', 'init+batch', 'online', 'online+batch'
+    trainmode = 'online+batch'
+    # train stops when the improvement of last iteration is smaller than this
+    finish_threshold = 0.005
     maxepochs = None            # ceiling on number of training epochs
     develannots = None          # boolean on whether to use dev-data file
     freqthreshold = 1           # compound frequency threshold for batch training
@@ -86,8 +83,11 @@ def morfessor_main_complete(train_files, dampening):
     savefile = None             # save file for binary model object
     savesegfile = None          # save file for human readable segmentation output
     lexfile = None              # save file for lexicon
-    input_is_list = False       # input files for batch training are lists (== args.list)
-    algparams = ()              # set algorithm parameters; for this model, we are not using 'viterbi', nothing to set
+    # input files for batch training are lists (== args.list)
+    input_is_list = False
+    # set algorithm parameters; for this model, we are not using 'viterbi',
+    # nothing to set
+    algparams = ()
 
     # Progress bar handling
     global show_progress_bar
@@ -147,7 +147,8 @@ def morfessor_main_complete(train_files, dampening):
                 data = io.read_corpus_list_files(trainfiles)
             else:
                 data = io.read_corpus_files(trainfiles)
-            total_cost = model.load_data(data, freqthreshold, dampfunc, splitprob)
+            total_cost = model.load_data(
+                data, freqthreshold, dampfunc, splitprob)
 
         elif trainmode == 'init+batch':
             if input_is_list:
@@ -156,30 +157,32 @@ def morfessor_main_complete(train_files, dampening):
                 data = io.read_corpus_files(trainfiles)
 
             # it is unknown why this line is needed
-            total_cost = model.load_data(data, freqthreshold, dampfunc, splitprob)
+            total_cost = model.load_data(
+                data, freqthreshold, dampfunc, splitprob)
 
             epochs, total_cost = model.train_batch(algorithm, algparams, develannots,
-                                     finish_threshold, maxepochs)
+                                                   finish_threshold, maxepochs)
             _logger.info("Epochs: %s" % epochs)
 
         elif trainmode == 'online':
             data = io.read_corpus_files(trainfiles)
             epochs, total_cost = model.train_online(data, dampfunc, epochinterval,
-                                      algorithm, algparams,
-                                      splitprob, maxepochs)
+                                                    algorithm, algparams,
+                                                    splitprob, maxepochs)
             _logger.info("Epochs: %s" % epochs)
 
         elif trainmode == 'online+batch':
             data = io.read_corpus_files(trainfiles)
             epochs, total_cost = model.train_online(data, dampfunc, epochinterval,
-                                      algorithm, algparams,
-                                      splitprob, maxepochs)
+                                                    algorithm, algparams,
+                                                    splitprob, maxepochs)
             epochs, total_cost = model.train_batch(algorithm, algparams, develannots,
-                                     finish_threshold, maxepochs)
+                                                   finish_threshold, maxepochs)
             _logger.info("Epochs: %s" % epochs)
 
         else:
-            raise ArgumentException("unknown training mode '{0:s}'".format(trainmode))
+            raise ArgumentException(
+                "unknown training mode '{0:s}'".format(trainmode))
 
         time_end = time.time()
         _logger.info("Final cost: %s" % total_cost)
@@ -243,7 +246,8 @@ def morfessor_main(train_files, dampening, cycle='test', save_file=None):
     """
 
     # define input variables normally input at command line
-    # all arguments are equal to their args.item equivalent in original script's main()
+    # all arguments are equal to their args.item equivalent in original
+    # script's main()
 
     trainfiles = train_files    # input files for training
     progress = True             # show progress bar
@@ -253,17 +257,23 @@ def morfessor_main(train_files, dampening, cycle='test', save_file=None):
     lowercase = False           # makes all inputs lowercase
     forcesplit = ['-']          # list of chars to force a split on
     corpusweight = 1.0          # load annotation data for tuning the corpus weight param
-    skips = False               # use random skips for frequently seen compounds to speed up training
-    nosplit = None              # if the expression matches the two surrounding characters, do not allow splitting
+    # use random skips for frequently seen compounds to speed up training
+    skips = False
+    # if the expression matches the two surrounding characters, do not allow
+    # splitting
+    nosplit = None
     dampening = dampening       # 'none', 'ones', or 'log'
     algorithm = 'recursive'     # 'recursive' or 'viterbi'
-    finish_threshold = 0.005    # train stops when the improvement of last iteration is smaller than this
+    # train stops when the improvement of last iteration is smaller than this
+    finish_threshold = 0.005
     maxepochs = None            # ceiling on number of training epochs
     develannots = None          # boolean on whether to use dev-data file
     freqthreshold = 1           # compound frequency threshold for batch training
     splitprob = None            # initialize new words by random split using given probability
     epochinterval = 10000       # epoch interval for online training
-    algparams = ()              # set algorithm parameters; for this model, we are not using 'viterbi', nothing to set
+    # set algorithm parameters; for this model, we are not using 'viterbi',
+    # nothing to set
+    algparams = ()
 
     # Progress bar handling
     global show_progress_bar
@@ -326,3 +336,80 @@ def morfessor_main(train_files, dampening, cycle='test', save_file=None):
 
     # return model object for further manipulation
     return model
+
+
+def segment_main(model, outfile, testfile):
+
+    encoding = 'utf-8'          # if None, tries UTF-8 and/or local encoding
+    cseparator = '\s+'          # separator for compound segmentation
+    separator = None            # separator for atom segmentation
+    lowercase = False           # makes all inputs lowercase
+    outputformat = r'{analysis}\n'
+    outputformatseparator = ' '
+    outputnewlines = False
+    nbest = 1
+    viterbismooth = 0
+    viterbimaxlen = 30
+
+    io = MorfessorIO(encoding=encoding,
+                     compound_separator=cseparator,
+                     atom_separator=separator,
+                     lowercase=lowercase)
+
+    _logger.info("Segmenting test data...")
+    outformat = outputformat
+    csep = outputformatseparator
+
+    outformat = outformat.replace(r"\n", "\n")
+    outformat = outformat.replace(r"\t", "\t")
+
+    keywords = [x[1] for x in string.Formatter().parse(outformat)]
+
+    with io._open_text_file_write(outfile) as fobj:
+
+        testdata = io.read_corpus_file(testfile)
+
+        i = 0
+        for count, compound, atoms in testdata:
+
+            if len(atoms) == 0:
+
+                # Newline in corpus
+                if outputnewlines:
+                    fobj.write("\n")
+                continue
+
+            if "clogprob" in keywords:
+                clogprob = model.forward_logprob(atoms)
+            else:
+                clogprob = 0
+            if nbest > 1:
+                nbestlist = model.viterbi_nbest(atoms, nbest,
+                                                viterbismooth,
+                                                viterbimaxlen)
+                for constructions, logp in nbestlist:
+                    analysis = csep.join(constructions)
+                    fobj.write(outformat.format(analysis=analysis,
+                                                compound=compound,
+                                                count=count, logprob=logp,
+                                                clogprob=clogprob))
+            else:
+                constructions, logp = model.viterbi_segment(
+                    atoms, viterbismooth, viterbimaxlen)
+                analysis = csep.join(constructions)
+                fobj.write(outformat.format(analysis=analysis,
+                                            compound=compound,
+                                            count=count, logprob=logp,
+                                            clogprob=clogprob))
+            i += 1
+            if i % 10000 == 0:
+                sys.stderr.write(".")
+        sys.stderr.write("\n")
+    _logger.info("Done.")
+
+    # if args.goldstandard is not None:
+    #     _logger.info("Evaluating Model")
+    #     e = MorfessorEvaluation(io.read_annotations_file(args.goldstandard))
+    #     result = e.evaluate_model(model, meta_data={'name': 'MODEL'})
+    #     print(result.format(FORMAT_STRINGS['default']))
+    #     _logger.info("Done")"Done")

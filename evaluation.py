@@ -18,12 +18,14 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import logging
+import os.path
+import tempfile
 
-# import morfessor
 from morfessor.io import MorfessorIO
 from morfessor.evaluation import MorfessorEvaluation, FORMAT_STRINGS, WilcoxonSignedRank
 
 from preprocessor import AffixFilter
+from segmenter import segment_main
 
 _logger = logging.getLogger(__name__)
 
@@ -42,7 +44,6 @@ class InfixerEvaluation(object):
         self._model = morfessor_model
         self._feature_dict = feature_dict
 
-        # TODO: build this API
         self._affix_filter = AffixFilter(affix_list)
 
         # set up morfessor's IO class
@@ -80,12 +81,14 @@ class InfixerEvaluation(object):
 
         with open(file_name, 'r') as f:
             file_data = f.read().split('\n')
+            annotation_list = [line for line in file_data if line != '']
 
         annotations = {}
         _logger.info(
             "Reading gold standard annotations from '%s'..." % file_name)
-        for line in file_data:
+        for line in annotation_list:
             # analyses = []
+            # print(line)
             compound, analyses_line = line.split(None, 1)
 
             # apply filtering transformations if needed
@@ -118,3 +121,32 @@ class InfixerEvaluation(object):
             wsr = WilcoxonSignedRank()
             r = wsr.significance_test(results)
             WilcoxonSignedRank.print_table(r)
+
+
+class InfixerSegmenter(InfixerEvaluation):
+
+    def _process_infile(self, infile):
+
+        with open(infile, 'r') as f:
+            data = f.read().split('\n')
+
+        data_filtered = []
+        for word in data:
+            data_filtered.append(self._update_compounds(word))
+
+        temp_dir = tempfile.TemporaryDirectory()
+        container_file = os.path.join(temp_dir.name, 'temp_file.txt')
+
+        with open(container_file, 'w') as f:
+            f.write('\n'.join(data_filtered))
+
+        return container_file
+
+    def segment_file(self, infile, outfile):
+
+        infile_new = self._process_infile(infile)
+
+        segment_main(self._model, outfile, infile_new)
+
+        # TODO: why did a bunch of the words disappear in the outfile?
+        # TODO: distinguish between in-vocab and OOV in output

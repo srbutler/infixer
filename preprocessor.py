@@ -579,7 +579,7 @@ class InfixerModel(object):
         elif which_model.lower() == 'test':
             return self.model_test
 
-        elif which_model.lower() == 'init':
+        elif which_model.lower() == 'final':
             return self.model_final
 
     def write_feature_dict(self, out_file, output_format):
