@@ -3,7 +3,7 @@
 
 ## local project directories and files
 output/
-preprocessing_test.py
+#preprocessing_test.py
 tokenization_test.py
 
 *.iml
