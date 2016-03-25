@@ -1,4 +1,3 @@
-
 import collections
 import json
 import logging
@@ -78,7 +77,7 @@ class AffixFilter(object):
         :param word: a word string to be filtered
         """
 
-        word_filtered = ''
+        word_filtered = word
 
         for affix_tuple in self.formatted_affixes:
 
@@ -463,6 +462,25 @@ class InfixerModel(object):
 
         self.word_changes = changed_words
 
+    def _clean_segments(self, separator_list):
+        """Remove unwanted characters from segment lists."""
+
+        segment_keys = ['test_segments', 'final_segments']
+
+        for word in self._feature_dict:
+
+            for seg_key in segment_keys:
+
+                segments = self._feature_dict[word].get(seg_key, None)
+
+                if segments is not None:
+
+                    # ensure the checked item is a list
+                    assert(isinstance(segments, list))
+
+                    segments_clean = [item for item in segments if item not in separator_list]
+                    self._feature_dict[word][seg_key] = segments_clean
+
     # -------------------------- model building -------------------------
 
     def _build_model(self, save_file):
@@ -532,6 +550,9 @@ class InfixerModel(object):
         _logger.info("FINAL CYCLE: training Morfessor Baseline model")
         self.model_final = self._build_model(save_file)
 
+        # clean up segment lists
+        self._clean_segments(separator_list=['-'])
+
         _logger.info("Final model built.")
 
     # ---------------------------- loading methods ---------------------------
@@ -548,6 +569,11 @@ class InfixerModel(object):
         _logger.info("Feature dictionary loaded from '{}'".format(in_file))
 
         return json_defdict
+
+    @classmethod
+    def get_features_dict_from_file(cls, in_file):
+
+        return cls._load_json_dict(in_file)
 
     def load_init_json(self, in_file):
 

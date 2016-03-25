@@ -1,26 +1,6 @@
-
-import logging
-import math
-import os
-import string
-import sys
-import tempfile
-import time
-
-from morfessor.baseline import BaselineModel
-from morfessor.exception import ArgumentException
-from morfessor.io import MorfessorIO
-
-PY3 = sys.version_info.major == 3
-
-_logger = logging.getLogger(__name__)
-
-
-def morfessor_main_complete(train_files, dampening):
-    """Calls an implementation of the Morfessor model (copyright notice below).
-
-    :param dampening: 'none', 'ones', or 'log'
-    :param train_files: input files for model training
+""" Most of the contents of this file are variations on scripts
+    published as part of Morfessor on PiPY. The license for this code
+    is reproduced below:
 
     Morfessor
     Copyright (total_cost) 2012, Sami Virpioja and Peter Smit
@@ -49,7 +29,30 @@ def morfessor_main_complete(train_files, dampening):
     CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
     LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
     ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-    POSSIBILITY OF SUCH DAMAGE.
+    POSSIBILITY OF SUCH DAMAGE."""
+
+
+import logging
+import math
+# import os
+import sys
+# import tempfile
+import time
+
+from morfessor.baseline import BaselineModel
+from morfessor.exception import ArgumentException
+from morfessor.io import MorfessorIO
+
+PY3 = sys.version_info.major == 3
+
+_logger = logging.getLogger(__name__)
+
+
+def morfessor_main_complete(train_files, dampening):
+    """Calls an implementation of the Morfessor model (copyright notice below).
+
+    :param dampening: 'none', 'ones', or 'log'
+    :param train_files: input files for model training
     """
 
     # define input variables normally input at command line
@@ -214,35 +217,6 @@ def morfessor_main(train_files, dampening, cycle='test', save_file=None):
     :param cycle: from {'init', 'test', 'final'}
     :param save_file: base name of output files (if needed)
     :return: trained morfessor.BaselineModel
-
-    Morfessor
-    Copyright (total_cost) 2012, Sami Virpioja and Peter Smit
-    All rights reserved.
-
-    Redistribution and use in source and binary forms, with or without
-    modification, are permitted provided that the following conditions
-    are met:
-
-    1.  Redistributions of source code must retain the above copyright
-        notice, this list of conditions and the following disclaimer.
-
-    2.  Redistributions in binary form must reproduce the above
-        copyright notice, this list of conditions and the following
-        disclaimer in the documentation and/or other materials provided
-        with the distribution.
-
-    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-    FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-    COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-    INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-    BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-    LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-    CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-    LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-    ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-    POSSIBILITY OF SUCH DAMAGE.
     """
 
     # define input variables normally input at command line
@@ -338,15 +312,14 @@ def morfessor_main(train_files, dampening, cycle='test', save_file=None):
     return model
 
 
-def segment_main(model, outfile, testfile):
+def segment_main(model, testfile):
 
-    encoding = 'utf-8'          # if None, tries UTF-8 and/or local encoding
-    cseparator = '\s+'          # separator for compound segmentation
-    separator = None            # separator for atom segmentation
-    lowercase = False           # makes all inputs lowercase
+    encoding = 'utf-8'
+    cseparator = '\s+'
+    separator = None
+    lowercase = False
     outputformat = r'{analysis}\n'
     outputformatseparator = ' '
-    outputnewlines = False
     nbest = 1
     viterbismooth = 0
     viterbimaxlen = 30
@@ -363,49 +336,34 @@ def segment_main(model, outfile, testfile):
     outformat = outformat.replace(r"\n", "\n")
     outformat = outformat.replace(r"\t", "\t")
 
-    keywords = [x[1] for x in string.Formatter().parse(outformat)]
+    # keywords = [x[1] for x in string.Formatter().parse(outformat)]
 
-    with io._open_text_file_write(outfile) as fobj:
+    testdata = io.read_corpus_file(testfile)
+    i = 0
+    analyses = []
 
-        testdata = io.read_corpus_file(testfile)
+    for count, compound, atoms in testdata:
 
-        i = 0
-        for count, compound, atoms in testdata:
+        if nbest > 1:
+            nbestlist = model.viterbi_nbest(atoms, nbest, viterbismooth, viterbimaxlen)
 
-            if len(atoms) == 0:
-
-                # Newline in corpus
-                if outputnewlines:
-                    fobj.write("\n")
-                continue
-
-            if "clogprob" in keywords:
-                clogprob = model.forward_logprob(atoms)
-            else:
-                clogprob = 0
-            if nbest > 1:
-                nbestlist = model.viterbi_nbest(atoms, nbest,
-                                                viterbismooth,
-                                                viterbimaxlen)
-                for constructions, logp in nbestlist:
-                    analysis = csep.join(constructions)
-                    fobj.write(outformat.format(analysis=analysis,
-                                                compound=compound,
-                                                count=count, logprob=logp,
-                                                clogprob=clogprob))
-            else:
-                constructions, logp = model.viterbi_segment(
-                    atoms, viterbismooth, viterbimaxlen)
+            for constructions, logp in nbestlist:
                 analysis = csep.join(constructions)
-                fobj.write(outformat.format(analysis=analysis,
-                                            compound=compound,
-                                            count=count, logprob=logp,
-                                            clogprob=clogprob))
-            i += 1
-            if i % 10000 == 0:
-                sys.stderr.write(".")
+                analyses.append((compound, analysis))
+
+        else:
+            constructions, logp = model.viterbi_segment(atoms, viterbismooth, viterbimaxlen)
+            analysis = csep.join(constructions)
+            analyses.append((compound, analysis))
+
+        i += 1
+        if i % 10000 == 0:
+            sys.stderr.write(".")
+
         sys.stderr.write("\n")
+
     _logger.info("Done.")
+    return analyses
 
     # if args.goldstandard is not None:
     #     _logger.info("Evaluating Model")
@@ -413,3 +371,68 @@ def segment_main(model, outfile, testfile):
     #     result = e.evaluate_model(model, meta_data={'name': 'MODEL'})
     #     print(result.format(FORMAT_STRINGS['default']))
     #     _logger.info("Done")"Done")
+
+
+def morfessor_segment_word(model, word):
+
+    pass
+
+
+# def morfessor_segment_word(model, word):
+#
+#     encoding = 'utf-8'
+#     cseparator = '\s+'
+#     separator = None
+#     lowercase = False
+#     outputformat = r'{analysis}\n'
+#     outputformatseparator = ' '
+#     nbest = 1
+#     viterbismooth = 0
+#     viterbimaxlen = 30
+#
+#     io = MorfessorIO(encoding=encoding,
+#                      compound_separator=cseparator,
+#                      atom_separator=separator,
+#                      lowercase=lowercase)
+#
+#     _logger.info("Segmenting test data...")
+#     outformat = outputformat
+#     csep = outputformatseparator
+#
+#     for compound in cseparator.split(word):
+#             if len(compound) > 0:
+#                 yield 1, compound, compound
+#             yield 0, "\n", ()
+#
+#     i = 0
+#     analyses = []
+#
+#     for count, compound, atoms in testdata:
+#
+#         if nbest > 1:
+#             nbestlist = model.viterbi_nbest(atoms, nbest, viterbismooth, viterbimaxlen)
+#
+#             for constructions, logp in nbestlist:
+#                 analysis = csep.join(constructions)
+#                 analyses.append((compound, analysis))
+#
+#         else:
+#             constructions, logp = model.viterbi_segment(atoms, viterbismooth, viterbimaxlen)
+#             analysis = csep.join(constructions)
+#             analyses.append((compound, analysis))
+#
+#         i += 1
+#         if i % 10000 == 0:
+#             sys.stderr.write(".")
+#
+#         sys.stderr.write("\n")
+#
+#     _logger.info("Done.")
+#     return analyses
+#
+#     # if args.goldstandard is not None:
+#     #     _logger.info("Evaluating Model")
+#     #     e = MorfessorEvaluation(io.read_annotations_file(args.goldstandard))
+#     #     result = e.evaluate_model(model, meta_data={'name': 'MODEL'})
+#     #     print(result.format(FORMAT_STRINGS['default']))
+#     #     _logger.info("Done")"Done")

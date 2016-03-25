@@ -21,11 +21,10 @@ import logging
 import os.path
 import tempfile
 
-from morfessor.io import MorfessorIO
 from morfessor.evaluation import MorfessorEvaluation, FORMAT_STRINGS, WilcoxonSignedRank
+from morfessor.io import MorfessorIO
 
 from preprocessor import AffixFilter
-from segmenter import segment_main
 
 _logger = logging.getLogger(__name__)
 
@@ -59,11 +58,13 @@ class InfixerEvaluation(object):
         """
 
         if word in self._feature_dict:
-            return self._feature_dict[word].get('final_word_base', word)
 
-        # TODO: build AffixFilter.filter_word(word)
+            _logger.debug("IN DICT: {} -> {}".format(word, self._feature_dict[word].get('final_word_base', word)))
+            return ("IV", self._feature_dict[word].get('final_word_base', word))
+
         else:
-            return self._affix_filter.filter_word(word)
+            _logger.debug("OOV: {} -> {}".format(word, self._affix_filter.filter_word(word)))
+            return ("OOV", self._affix_filter.filter_word(word))
 
     def _read_annotations_file(self, file_name, construction_separator=' ', analysis_sep=','):
         """Convert annotation file to generator.
@@ -110,6 +111,7 @@ class InfixerEvaluation(object):
         return annotations
 
     def evaluate_model(self, gold_standard_file, wilcoxon=False):
+        """Call the morfessor evaluator."""
 
         annotations = self._read_annotations_file(gold_standard_file)
         eval_obj = MorfessorEvaluation(annotations)
@@ -122,10 +124,22 @@ class InfixerEvaluation(object):
             r = wsr.significance_test(results)
             WilcoxonSignedRank.print_table(r)
 
+    def segment_word(self, word, separators=('-')):
+        """Segment a given word using a trained morfessor model.
 
-class InfixerSegmenter(InfixerEvaluation):
+        :param word: the input word string
+        """
 
-    def _process_infile(self, infile):
+        separator = ' '
+        viterbi_smooth = 0
+        viterbi_maxlen = 30
+
+        constructions, _ = self._model.viterbi_segment(word, viterbi_smooth, viterbi_maxlen)
+        constructions_filtered = [item for item in constructions if item not in separators]
+        return separator.join(constructions_filtered)
+
+    def _process_segment_file(self, infile):
+        """Process a word file to be segmented to ensure compatibility with the model."""
 
         with open(infile, 'r') as f:
             data = f.read().split('\n')
@@ -139,14 +153,100 @@ class InfixerSegmenter(InfixerEvaluation):
 
         with open(container_file, 'w') as f:
             f.write('\n'.join(data_filtered))
+            _logger.debug('\n'.join(data_filtered))
 
         return container_file
 
-    def segment_file(self, infile, outfile):
+    def _filter_input_list(self, infile):
+        """Process a word file to be segmented to ensure compatibility with the model."""
 
-        infile_new = self._process_infile(infile)
+        with open(infile, 'r') as f:
+            data = f.read().split('\n')
 
-        segment_main(self._model, outfile, infile_new)
+        data_filtered = []
+        for word in data:
 
-        # TODO: why did a bunch of the words disappear in the outfile?
-        # TODO: distinguish between in-vocab and OOV in output
+            # filter empty strings
+            if word == '':
+                continue
+            else:
+                vocab_status, word_filtered = self._update_compounds(word)
+                data_filtered.append((word, vocab_status, word_filtered))
+
+        return data_filtered
+
+    def segment_file(self, infile, outfile, separator=','):
+        """Segment an input file and write to an outfile.
+
+        :param infile:
+        :param outfile:
+        :param separator:
+        """
+
+        words_filtered = self._filter_input_list(infile)
+
+        with open(outfile, 'w') as f:
+
+            for word, vocab_status, word_filtered in words_filtered:
+
+                items = {'word': word,
+                         'status': vocab_status,
+                         'filtered': word_filtered,
+                         'segments': self.segment_word(word_filtered),
+                         'sep': separator}
+
+                out_str = '{word}{sep}{status}{sep}{filtered}{sep}{segments}\n'.format(**items)
+
+                f.write(out_str)
+
+            _logger.info('Segmentations written to {}'.format(outfile))
+
+    def _filter_gold_standard(self, infile):
+        """Process a word file to be segmented to ensure compatibility with the model."""
+
+        with open(infile, 'r') as f:
+            # data = f.read().split('\n')
+            data = f.readlines()
+
+        data_filtered = []
+        for line in data:
+
+            # split word and segmentation
+            # print(line)
+            word, gold_segmentation = line.split(None, 1)
+
+            # filter empty strings
+            if word == '':
+                continue
+            else:
+                vocab_status, word_filtered = self._update_compounds(word)
+                data_filtered.append((word, vocab_status, word_filtered, gold_segmentation.strip()))
+
+        return data_filtered
+
+    def segment_gold_standard(self, gs_infile, outfile, separator=','):
+        """Segment an input file and write to an outfile.
+
+        :param gs_infile:
+        :param outfile:
+        :param separator:
+        """
+
+        words_filtered = self._filter_gold_standard(gs_infile)
+
+        with open(outfile, 'w') as f:
+
+            for word, vocab_status, word_filtered, gs_segments in words_filtered:
+
+                items = {'word': word,
+                         'status': vocab_status,
+                         'filtered': word_filtered,
+                         'gs_segments': "GS: " + gs_segments,
+                         'segments': self.segment_word(word_filtered),
+                         'sep': separator}
+
+                out_str = '{word}{sep}{status}{sep}{filtered}{sep}{gs_segments}{sep}{segments}\n'.format(**items)
+
+                f.write(out_str)
+
+            _logger.info('Segmentations (gold standard) written to {}'.format(outfile))
