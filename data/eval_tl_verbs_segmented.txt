@@ -1,0 +1,229 @@
+sumulat	<um> sulat
+sumulat	<um> sulat
+sinulat	<in> sulat
+sinulatan	<in> sulat an
+ipinansulat	<in> ipan sulat
+ikinasulat	<in> ika sulat
+binasa	<in> basa
+ipinagbasa	<in> ipag basa
+binasahan	<in> basa han
+ipinambasa	<in> ipam basa
+ikinapagbasa	<in> ikapag basa
+hiniram	<in> hiram
+ipinanghiram	<in> ipang hiram
+hiniraman	<in> hiram an
+ipinanghiram	<in> ipang hiram
+ikinapanghiram	<in> ikapang hiram
+ikinagawa	<in> ika gawa
+ikinapagbasa	<in> ikapag basa
+ikinapangharana	<in> ikapang harana
+ikinagalit	<in> ika galit
+pinakibalot	<in> paki balot
+ipinakibalot	<in> i paki balot
+pinakibalutan	<in> paki balut an
+ipinakipangbalot	<in> ipakipang balot
+ikinapakibalot	<in> ikapaki balot
+kumain	<um> kain
+tumakbo	<um> takbo
+lumakad	<um> lukad
+sumulat	<um> sulat
+pumasok	<um> pasok
+pumunta	<um> punta
+umalis	<um> alis
+dumating	<um> dating
+umupo’	<um> upo’
+gumawa’	<um> gawa’
+umiyak	<um> iyak
+bumili	<um> bili
+kumanta	<um> kanta
+uminom	<um> inom
+kinain	<in> kain
+sinabi	<in> sabi
+pinasok	<in> pasok
+dinalaw	<in> dalaw
+sinipon	<in> sipon
+binaha'	<in> baha'
+ginabi	<in> gabi
+sumusulat	<redup> <um> sulat
+sinusulat	<in> <redup> sulat
+isinulat	<redup> <in> i sulat
+isinulatin	<redup> <in> i sulat in
+sinusulatan	<redup> <in> sulat an
+ipinansusulat	<redup> <in> ipan sulat
+ikinasusulat	<redup> <in> ika sulat
+binabasa	<redup> <in> basa
+ipinagbabasa	<redup> <in> ipag basa
+binabasahan	<redup> <in> basa han
+ipinambabasa	<redup> <in> ipam basa
+ikinapagbabasa	<redup> <in> ikapag basa
+hinihiram	<redup> <in> hiram
+ipinanghihiram	<redup> <in> ipang hiram
+hinihiraman	<redup> <in> hiram an
+ipinanghihiram	<redup> <in> ipang hiram
+ikinapanghihiram	<redup> <in> ikapang hiram
+ikinagagawa	<redup> <in> ika gawa
+ikinapagbabasa	<redup> <in> ikapag basa
+ikinapanghaharana	<redup> <in> ikapang harana
+ikinagagalit	<redup> <in> ika galit
+pinakikibalot	<redup> <in> paki balot
+ipinakikibalot	<redup> <in> i paki balot
+pinakikibalutan	<redup> <in> paki balut an
+ipinakikipangbalot	<redup> <in> ipakipang balot
+ikinapakikibalot	<redup> <in> ikapaki balot
+kinakain	<redup> <in> kain
+sinasabi	<redup> <in> sabi
+pinapasok	<redup> <in> pasok
+dinadalaw	<redup> <in> dalaw
+sinisipon	<redup> <in> sipon
+binabaha'	<redup> <in> baha'
+ginagabi	<redup> <in> gabi
+susulat	<redup> sulat
+susulatin	<redup> sulat in
+isusulat	<redup> i sulat
+susulatan	<redup> sulat an
+ipansusulat	<redup> ipan sulat
+ikasusulat	ika <redup> sulat
+magbabasa	<redup> mag basa
+nagbabasa	<redup> nag basa
+babasahin	<redup> basa hin
+ipagbabasa	<redup> ipag basa
+babasahan	<redup> basa han
+ipambabasa	<redup> ipam basa
+ikapagbabasa	<redup> ikapag basa
+manghihiram	<redup> mang hiram
+nanghihiram	<redup> nang hiram
+hihiramin	<redup> hiram in
+ipanghihiram	<redup> ipang hiram
+hihiraman	<redup> hiram an
+ipanghihiram	<redup> ipang hiram
+ikapanghihiram	<redup> ikapang hiram
+makakagawa	<redup> maka gawa
+magagawa	<redup> ma gawa
+nagagawa	<redup> na gawa
+maigagawa	<redup> mai gawa
+naigagawa	<redup> nai gawa
+magagawaan	<redup> ma gawa an
+nagagawaan	<redup> na gawa an
+maipanggagawa	<redup> maipang gawa
+naipanggagawa	<redup> naipang gawa
+ikagagawa	<redup> ika gawa
+makakapagbasa	<redup> makapag basa
+nakakapagbasa	<redup> nakapag basa
+mababasa	<redup> ma basa
+nababasa	<redup> na basa
+maipagbabasa	<redup> maipag basa
+naipagbabasa	<redup> naipag basa
+mapagbabasahan	<redup> mapag basa han
+napagbabasahan	<redup> napag basa han
+maipangbabasa	<redup> maipang basa
+naipangbabasa	<redup> naipang basa
+ikapagbabasa	<redup> ikapag basa
+makakapangharana	<redup> makapang harana
+nakakapangharana	<redup> nakapang harana
+mahaharana	<redup> ma harana
+nahaharana	<redup> na harana
+maipanghaharana	<redup> maipang harana
+naipanghaharana	<redup> naipang harana
+mapanghaharanahan	<redup> mapang harana han
+napanghaharanahan	<redup> napang harana han
+maipanghaharana	<redup> maipang harana
+naipanghaharana	<redup> naipang harana
+ikapanghaharana	<redup> ikapang harana
+magagalit	<redup> ma galit
+nagagalit	<redup> na galit
+ikagagalit	<redup> ika galit
+makikibalot	<redup> maki balot
+nakikibalot	<redup> naki balot
+pakikibalot	<redup> paki balot
+ipakikibalot	<redup> i paki balot
+pakikibalutan	<redup> paki balut an
+ipakikipangbalot	<redup> ipakipang balot
+ikapakikibalot	<redup> ikapaki balot
+kakainin	<redup> kain in
+sasabihin	<redup> sabi in
+papasukin	<redup> pasuk in
+dadalawin	<redup> dalaw in
+sisipunin	<redup> sipun in
+babahain	<redup> baha in
+gagabihin	<redup> gabih in
+sulatin	sulat in
+isulat	i sulat
+sulatan	sulat an
+ipansulat	ipan sulat
+ikasulat	ika sulat
+magbasa	mag basa
+nagbasa	nag basa
+basahin	basa hin
+ipagbasa	ipag basa
+basahan	basa han
+ipambasa	ipam basa
+ikapagbasa	ikapag basa
+manghiram	mang hiram
+nanghiram	nang hiram
+hiramin	hiram in
+ipanghiram	ipang hiram
+hiraman	hiram an
+ipanghiram	ipang hiram
+ikapanghiram	ikapang hiram
+makagawa	maka gawa
+nakagawa	naka gawa
+nakakagawa	nakaka gawa
+magawa	ma gawa
+nagawa	na gawa
+maigawa	mai gawa
+naigawa	nai gawa
+magawaan	ma gawa an
+nagawaan	na gawa an
+maipanggawa	maipang gawa
+naipanggawa	naipang gawa
+ikagawa	ika gawa
+makapagbasa	makapag basa
+nakapagbasa	nakapag basa
+mabasa	ma basa
+nabasa	na basa
+maipagbasa	maipag basa
+naipagbasa	naipag basa
+mapagbasahan	mapag basa han
+napagbasahan	napag basa han
+maipangbasa	maipang basa
+naipangbasa	naipang basa
+ikapagbasa	ikapag basa
+makapangharana	makapang harana
+nakapangharana	nakapang harana
+maharana	ma harana
+naharana	na harana
+maipangharana	maipang harana
+naipangharana	naipang harana
+mapangharanahan	mapang harana han
+napangharanahan	napang harana han
+maipangharana	maipang harana
+naipangharana	naipang harana
+ikapangharana	ikapang harana
+magalit	ma galit
+nagalit	na galit
+ikagalit	ika galit
+makibalot	maki balot
+nakibalot	naki balot
+pakibalot	paki balot
+ipakibalot	i paki balot
+pakibalutan	paki balut an
+ipakipangbalot	ipaki pang balot
+ikapakibalot	ikapaki balot
+kainin	kain in
+inumin	inum in
+mahalin	mahal in
+basahin	basah in
+lutuin	lutu in
+tapusin	tapus in
+sabihin	sabih in
+linisin	linis in
+tawagin	tawag in
+alisin	alis in
+isipin	isip in
+gisingin	gising in
+pasukin	pasuk in
+dalawin	dalaw in
+suntukin	suntuk in
+sipunin	sipun in
+bahain	baha in
+gabihin	gabih in

@@ -17,11 +17,12 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import collections
 import logging
 import os.path
 import tempfile
 
-from morfessor.evaluation import MorfessorEvaluation, FORMAT_STRINGS, WilcoxonSignedRank
+from morfessor.evaluation import EvaluationConfig, MorfessorEvaluation, FORMAT_STRINGS, WilcoxonSignedRank
 from morfessor.io import MorfessorIO
 
 from preprocessor import AffixFilter
@@ -110,19 +111,29 @@ class InfixerEvaluation(object):
         _logger.info("Done.")
         return annotations
 
-    def evaluate_model(self, gold_standard_file, wilcoxon=False):
-        """Call the morfessor evaluator."""
+    def evaluate_model(self, gold_standard_file, num_samples=10, sample_size=20):
+        """Call the morfessor evaluator.
+
+        :param gold_standard_file:
+        """
 
         annotations = self._read_annotations_file(gold_standard_file)
         eval_obj = MorfessorEvaluation(annotations)
-        results = eval_obj.evaluate_model(self._model)
+        results = eval_obj.evaluate_model(self._model, configuration=EvaluationConfig(num_samples, sample_size))
 
         print(results.format(FORMAT_STRINGS['default']))
 
-        if wilcoxon:
-            wsr = WilcoxonSignedRank()
-            r = wsr.significance_test(results)
-            WilcoxonSignedRank.print_table(r)
+    def return_evaluation(self, gold_standard_file, num_samples=10, sample_size=20):
+        """Call the morfessor evaluator.
+
+        :param gold_standard_file:
+        """
+
+        annotations = self._read_annotations_file(gold_standard_file)
+        eval_obj = MorfessorEvaluation(annotations)
+        results = eval_obj.evaluate_model(self._model, configuration=EvaluationConfig(num_samples, sample_size))
+
+        return results
 
     def segment_word(self, word, separators=('-')):
         """Segment a given word using a trained morfessor model.
@@ -223,6 +234,20 @@ class InfixerEvaluation(object):
                 data_filtered.append((word, vocab_status, word_filtered, gold_segmentation.strip()))
 
         return data_filtered
+
+    def output_modified_gold_standard(self, gs_infile, outfile):
+
+        words_filtered = self._filter_gold_standard(gs_infile)
+
+        with open(outfile, 'w') as f:
+
+            for word, vocab_status, word_filtered, gs_segments in words_filtered:
+
+                out_str = '{} {}\n'.format(word_filtered, gs_segments)
+                out_str.encode('utf-8')
+                f.write(out_str)
+
+        _logger.info("Modified gold standard written to {}".format(outfile))
 
     def segment_gold_standard(self, gs_infile, outfile, separator=','):
         """Segment an input file and write to an outfile.

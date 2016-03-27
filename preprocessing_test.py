@@ -13,7 +13,21 @@ PY3 = sys.version_info.major == 3
 _logger = logging.getLogger(__name__)
 
 
-def test_preprocessor():
+def output_model(train_file, out_file_bin, out_file_json, affix_list,
+                 dampening='none', threshold=1):
+
+    # morfessor model trained on the base set
+    infixer_model = InfixerModel(train_file, affix_list, dampening)
+
+    # build the test model
+    infixer_model.build_test_model()
+
+    # build the final model
+    infixer_model.build_final_model(threshold, save_file=out_file_bin)
+    infixer_model.write_feature_dict(out_file_json, 'json')
+
+
+def main():
 
     # logging format
     log_level = logging.INFO
@@ -40,57 +54,50 @@ def test_preprocessor():
 
     # ----------------------------------------------------------------------
 
-    # files and directories
-    # base_dir = "/Users/srbutler/Documents/CUNY/Classes/S4/thesis/"
-    train_file = 'data/tl_babel_tokens.txt'
-    base_outfile_name = 'babel_thresh1'
-
-    # ----------------------------------------------------------------------
-
     # for affix filtering
-    # test_affix_list = ['^(?P<con>\w)(um)(?P<vow>\w)((?P=con)(?P=vow).*)',
-    #                    '^(?P<con>\w)(in)(?P<vow>\w)((?P=con)(?P=vow).*)',
-    #                    r'^(i?.)(um)(.*)',
-    #                    r'^(i?.)(in)(.*)']
-    test_affix_list = [r'^(i?.)(um)(.*)', r'^(i?.)(in)(.*)']
-
-    # morfessor model trained on the base set
-    # infixer_model = InfixerModel(train_file, test_affix_list, dampening='none')
-    # infixer_model.write_feature_dict('output/REWRITE_init_' + base_outfile_name, 'json')
+    affix_list_redup_infixes = [r'^(?P<con>\w)(um)(?P<vow>\w)((?P=con)(?P=vow).*)',
+                                r'^(?P<con>\w)(in)(?P<vow>\w)((?P=con)(?P=vow).*)',
+                                r'^(i?.)(um)(.*)',
+                                r'^(i?.)(in)(.*)']
+    affix_list_infixes = [r'^(i?.)(um)(.*)', r'^(i?.)(in)(.*)']
 
     # ----------------------------------------------------------------------
 
-    # build the test model
-    # infixer_model.build_test_model()
-    # infixer_model.write_feature_dict('output/REWRITE_retrain_' + base_outfile_name, 'json')
+    models_to_train = [('data/tl_wiki_tokens.txt',
+                        'output/models/tl_wiki_ri_none',
+                        'output/featdicts/tl_wiki_ri_none',
+                        affix_list_redup_infixes,
+                        'none'),
+                       ('data/tl_wiki_tokens.txt',
+                        'output/models/tl_wiki_ri_ones',
+                        'output/featdicts/tl_wiki_ri_ones',
+                        affix_list_redup_infixes,
+                        'ones'),
+                       ('data/tl_wiki_tokens.txt',
+                        'output/models/tl_wiki_ri_log',
+                        'output/featdicts/tl_wiki_ri_log',
+                        affix_list_redup_infixes,
+                        'log'),
+                       ('data/tl_wiki_tokens.txt',
+                        'output/models/tl_wiki_i_none',
+                        'output/featdicts/tl_wiki_i_none',
+                        affix_list_infixes,
+                        'none'),
+                       ('data/tl_wiki_tokens.txt',
+                        'output/models/tl_wiki_i_ones',
+                        'output/featdicts/tl_wiki_i_ones',
+                        affix_list_infixes,
+                        'ones'),
+                       ('data/tl_wiki_tokens.txt',
+                        'output/models/tl_wiki_i_log',
+                        'output/featdicts/tl_wiki_i_log',
+                        affix_list_infixes,
+                        'log'),
+                       ]
 
-    # ----------------------------------------------------------------------
+    for train, out_bin, out_json, affixl, damp in models_to_train:
 
-    # build the final model
-    # infixer_model.build_final_model(threshold=1, save_file='trained_models/babel_final_binary')
-    # infixer_model.write_changed_tokens('output/REWRITE_changed_tokens_' + base_outfile_name + '.txt')
-    # infixer_model.write_feature_dict('output/REWRITE_final_' + base_outfile_name, 'json')
-
-    # ----------------------------------------------------------------------
-
-    # get stored model and feature dict
-    io = MorfessorIO(encoding='utf-8', compound_separator='\s+', atom_separator=None, lowercase=False)
-    morf_model = io.read_binary_model_file('trained_models/babel_final_binaryFINAL_bin')
-    feature_dict = InfixerModel.get_features_dict_from_file('output/REWRITE_final_babel_thresh1.json')
-
-    file_to_segment = 'data/eval_tl_verbs.txt'
-    segment_outfile = 'output/segmentation_test_6.csv'
-
-    gold_standard = 'data/eval_tl_verbs_segmented.txt'
-    gs_outfile = 'output/GS_segmentation_test_1'
-
-    # morf_model = infixer_model.get_model('final')
-    # feature_dict = infixer_model.feature_dictionary()
-
-    # eval and segment to file
-    evaluator = InfixerEvaluation(morf_model, feature_dict, test_affix_list)
-    evaluator.segment_file(file_to_segment, segment_outfile)
-    evaluator.segment_gold_standard(gold_standard, gs_outfile)
+        output_model(train, out_bin, out_json, affixl, dampening=damp, threshold=1)
 
 if __name__ == '__main__':
-    test_preprocessor()
+    main()
