@@ -1,5 +1,5 @@
 """ Most of the contents of this file are variations on scripts
-    published as part of Morfessor on PiPY. The license for this code
+    published as part of Morfessor on PyPI. The license for this code
     is reproduced below:
 
     Morfessor
@@ -34,16 +34,11 @@
 
 import logging
 import math
-# import os
-import sys
-# import tempfile
 import time
 
 from morfessor.baseline import BaselineModel
 from morfessor.exception import ArgumentException
 from morfessor.io import MorfessorIO
-
-PY3 = sys.version_info.major == 3
 
 _logger = logging.getLogger(__name__)
 
@@ -231,23 +226,16 @@ def morfessor_main(train_files, dampening, cycle='test', save_file=None):
     lowercase = False           # makes all inputs lowercase
     forcesplit = ['-']          # list of chars to force a split on
     corpusweight = 1.0          # load annotation data for tuning the corpus weight param
-    # use random skips for frequently seen compounds to speed up training
-    skips = False
-    # if the expression matches the two surrounding characters, do not allow
-    # splitting
-    nosplit = None
+    skips = False               # use random skips for frequently seen compounds to speed up training
+    nosplit = None              # if the expression matches the two surrounding characters, do not allow splitting
     dampening = dampening       # 'none', 'ones', or 'log'
     algorithm = 'recursive'     # 'recursive' or 'viterbi'
-    # train stops when the improvement of last iteration is smaller than this
-    finish_threshold = 0.005
+    finish_threshold = 0.005    # train stops when the improvement of last iteration is smaller than this
     maxepochs = None            # ceiling on number of training epochs
     develannots = None          # boolean on whether to use dev-data file
-    freqthreshold = 1           # compound frequency threshold for batch training
     splitprob = None            # initialize new words by random split using given probability
     epochinterval = 10000       # epoch interval for online training
-    # set algorithm parameters; for this model, we are not using 'viterbi',
-    # nothing to set
-    algparams = ()
+    algparams = ()              # set algorithm parameters; for this model, we are not using 'viterbi', nothing to set
 
     # Progress bar handling
     global show_progress_bar
@@ -310,129 +298,3 @@ def morfessor_main(train_files, dampening, cycle='test', save_file=None):
 
     # return model object for further manipulation
     return model
-
-
-def segment_main(model, testfile):
-
-    encoding = 'utf-8'
-    cseparator = '\s+'
-    separator = None
-    lowercase = False
-    outputformat = r'{analysis}\n'
-    outputformatseparator = ' '
-    nbest = 1
-    viterbismooth = 0
-    viterbimaxlen = 30
-
-    io = MorfessorIO(encoding=encoding,
-                     compound_separator=cseparator,
-                     atom_separator=separator,
-                     lowercase=lowercase)
-
-    _logger.info("Segmenting test data...")
-    outformat = outputformat
-    csep = outputformatseparator
-
-    outformat = outformat.replace(r"\n", "\n")
-    outformat = outformat.replace(r"\t", "\t")
-
-    # keywords = [x[1] for x in string.Formatter().parse(outformat)]
-
-    testdata = io.read_corpus_file(testfile)
-    i = 0
-    analyses = []
-
-    for count, compound, atoms in testdata:
-
-        if nbest > 1:
-            nbestlist = model.viterbi_nbest(atoms, nbest, viterbismooth, viterbimaxlen)
-
-            for constructions, logp in nbestlist:
-                analysis = csep.join(constructions)
-                analyses.append((compound, analysis))
-
-        else:
-            constructions, logp = model.viterbi_segment(atoms, viterbismooth, viterbimaxlen)
-            analysis = csep.join(constructions)
-            analyses.append((compound, analysis))
-
-        i += 1
-        if i % 10000 == 0:
-            sys.stderr.write(".")
-
-        sys.stderr.write("\n")
-
-    _logger.info("Done.")
-    return analyses
-
-    # if args.goldstandard is not None:
-    #     _logger.info("Evaluating Model")
-    #     e = MorfessorEvaluation(io.read_annotations_file(args.goldstandard))
-    #     result = e.evaluate_model(model, meta_data={'name': 'MODEL'})
-    #     print(result.format(FORMAT_STRINGS['default']))
-    #     _logger.info("Done")"Done")
-
-
-def morfessor_segment_word(model, word):
-
-    pass
-
-
-# def morfessor_segment_word(model, word):
-#
-#     encoding = 'utf-8'
-#     cseparator = '\s+'
-#     separator = None
-#     lowercase = False
-#     outputformat = r'{analysis}\n'
-#     outputformatseparator = ' '
-#     nbest = 1
-#     viterbismooth = 0
-#     viterbimaxlen = 30
-#
-#     io = MorfessorIO(encoding=encoding,
-#                      compound_separator=cseparator,
-#                      atom_separator=separator,
-#                      lowercase=lowercase)
-#
-#     _logger.info("Segmenting test data...")
-#     outformat = outputformat
-#     csep = outputformatseparator
-#
-#     for compound in cseparator.split(word):
-#             if len(compound) > 0:
-#                 yield 1, compound, compound
-#             yield 0, "\n", ()
-#
-#     i = 0
-#     analyses = []
-#
-#     for count, compound, atoms in testdata:
-#
-#         if nbest > 1:
-#             nbestlist = model.viterbi_nbest(atoms, nbest, viterbismooth, viterbimaxlen)
-#
-#             for constructions, logp in nbestlist:
-#                 analysis = csep.join(constructions)
-#                 analyses.append((compound, analysis))
-#
-#         else:
-#             constructions, logp = model.viterbi_segment(atoms, viterbismooth, viterbimaxlen)
-#             analysis = csep.join(constructions)
-#             analyses.append((compound, analysis))
-#
-#         i += 1
-#         if i % 10000 == 0:
-#             sys.stderr.write(".")
-#
-#         sys.stderr.write("\n")
-#
-#     _logger.info("Done.")
-#     return analyses
-#
-#     # if args.goldstandard is not None:
-#     #     _logger.info("Evaluating Model")
-#     #     e = MorfessorEvaluation(io.read_annotations_file(args.goldstandard))
-#     #     result = e.evaluate_model(model, meta_data={'name': 'MODEL'})
-#     #     print(result.format(FORMAT_STRINGS['default']))
-#     #     _logger.info("Done")"Done")
