@@ -1,3 +1,13 @@
+"""This file contains the primary parts of the program: the InfixerModel class,
+which ultimately acts as a modified MorfessorBaseline object designed to handle
+an input list of known non-concatenative morphemes, and the AffixFilter class,
+which handles the processing and filtering of those affixes.
+"""
+
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import collections
 import json
 import logging
@@ -6,18 +16,39 @@ import pickle
 import re
 import tempfile
 
-from segmenter import morfessor_main
+from utilities import morfessor_main
 
 _logger = logging.getLogger(__name__)
 
 
 class AffixFilter(object):
+    """An object than can processes affix regexps find and filter those affixes in words.
+
+    This processes affixes for use with InfixerModel, InfixerEvaluation, and
+    InfixerSegmenter. Additionally, it filters the feature dictionaries used by
+    InfixerModel so that all affix processing can be handled from one class, allowing
+    for modifications of affix processing over time without worrying about the model's
+    design.
+
+    The regular expressions should be ordered in descending priority; once a match is
+    encountered, the filtering happens and the loop moves to the next word.
+
+    Public functions:
+        filter_word
+        filter_feature_dictionary
+    """
 
     def __init__(self, affix_list):
-        """An object than can find and filter affixes in words."""
+        """Initialize an AffixFilter object using an order list of affix regular expressions.
 
-        self.affix_list = affix_list
-        self.formatted_affixes = self._format_affixes(affix_list)
+        :param affix_list: a list of affix regular expressions for search and filtering
+        """
+
+        if isinstance(affix_list, list):
+            self.affix_list = affix_list
+            self.formatted_affixes = self._format_affixes(affix_list)
+        else:
+            raise ValueError("Input must be a list.")
 
     @staticmethod
     def _make_group_pattern(regex):
@@ -99,7 +130,7 @@ class AffixFilter(object):
     def filter_feature_dictionary(self, feature_dictionary):
         """Cycle through each word and remove the affixes if present.
 
-        :param feature_dictionary: the feature dictionary from a ModelBuilder object
+        :param feature_dictionary: the feature dictionary from an InfixerModel object
         """
 
         for word in feature_dictionary:
@@ -130,8 +161,46 @@ class AffixFilter(object):
 
 
 class InfixerModel(object):
+    """A modified Morfessor-type model for use with a list of known affixes.
+
+    This model is built around the already extant Python-implementation of the
+    Morfessor segmentation algorithm. Its purpose is to modify that model
+    to better handle the presence of known non-concatenative morphological
+    patterns. This process involves three training cycles (each involving storage
+    in the _feature_dict data structure):
+
+        1. init: train an unmodified Morfessor model, store data in _feature_dict
+        2. test: train a Morfessor model using a modified corpus containing every possible
+            instance of any of the input affixes
+        3. final: train the final Morfessor model on a modified corpus containing the most
+            probable instances of the input affixes
+
+    Public methods:
+
+    modeling:
+        build_test_model
+        build_final_model
+
+    loading previous models:
+        get_feature_dict_from_file
+        load_init_json
+        load_test_json
+        load_final_json
+
+    getting and writing output:
+        feature_dictionary
+        get_model
+        write_feature_dict
+        write_changed_tokens
+    """
 
     def __init__(self, word_list_file, affix_list, dampening='none'):
+        """Initialize an InfixerModel and run the initial training step.
+
+        :param word_list_file: a text file containing one word per row
+        :param affix_list: an ordered list of regular expressions describing affixes to be tested
+        :param dampening: 'none' (default), 'ones', or 'log'
+        """
 
         self.cycle_name = 'INIT'
         self.dampening = dampening
@@ -156,9 +225,12 @@ class InfixerModel(object):
     def _call_morfessor(self, train_words, save_file):
         """Call the Morfessor Baseline model main on the supplied word list.
 
+        Because of certain issues with formatting, the input for the Morfessor
+        model must be saved to a temporary file to be read into the model.
+
         :param train_words: an iterable containing word strings for retraining
-        :param save_file:
-        :return:
+        :param save_file: an optional save file to write the binary to
+        :return: trained Morfessor model
         """
 
         temp_dir = tempfile.TemporaryDirectory()
@@ -167,9 +239,8 @@ class InfixerModel(object):
         with open(container_file, 'w') as f:
             f.write('\n'.join(train_words))
 
-        # input file must always be a list! the call fails otherwise
-        model = morfessor_main(
-            [container_file], self.dampening, self.cycle_name, save_file)
+        # NOTE: input file must always be a list! the call fails otherwise
+        model = morfessor_main([container_file], self.dampening, self.cycle_name, save_file)
 
         return model
 
@@ -301,8 +372,7 @@ class InfixerModel(object):
     def _filter_affixes(self):
         """Rebuild the feature dictionary with filtered forms for relevant words."""
 
-        feature_dict_filtered = self._affix_filter.filter_feature_dictionary(
-            self._feature_dict)
+        feature_dict_filtered = self._affix_filter.filter_feature_dictionary(self._feature_dict)
         self._feature_dict = feature_dict_filtered
 
     def _get_retrain_words(self):
@@ -338,7 +408,7 @@ class InfixerModel(object):
 
         return retrain_words, original_transformed_map
 
-    def _rebuild_original_wordforms(self, transformed_original_dict):
+    def _rebuild_original_words(self, transformed_original_dict):
         """Remove transformed mappings as values and store results under original base form.
 
         :param transformed_original_dict: dictionary of {transformed_word: original_word} pairs
@@ -381,8 +451,7 @@ class InfixerModel(object):
 
                 counter += 1
 
-        _logger.info('{}: {} word forms rebuilt in the feature dictionary.'.format(
-            cycle_name, counter))
+        _logger.info('{}: {} word forms rebuilt in the feature dictionary.'.format(cycle_name, counter))
 
     def _set_retrain_values(self):
         """Set counts and probabilities for each root affected by affix filter.
@@ -500,7 +569,7 @@ class InfixerModel(object):
         self._build_feature_dict(model)
 
         # repair self._feature_dict and correctly maps new values to right keys
-        self._rebuild_original_wordforms(transformed_mapping)
+        self._rebuild_original_words(transformed_mapping)
 
         return model
 
@@ -571,7 +640,7 @@ class InfixerModel(object):
         return json_defdict
 
     @classmethod
-    def get_features_dict_from_file(cls, in_file):
+    def get_feature_dict_from_file(cls, in_file):
 
         return cls._load_json_dict(in_file)
 
