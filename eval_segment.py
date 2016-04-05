@@ -1,28 +1,20 @@
-"""
-What does evaluation involve?
-    1. Check the input word against the dictionary
-       1. if match, return final_word_base, final_root, and
-          final_segments
-       2. else return OOV mark
-    2. Assemble a list of appropriate forms for morfessor evaluation
-       1. for words in dictionary, append final_word_base or
-          init_word_base (in that order)
-       2. for OOV words, run through same affix filter
-          as model and return result
-    3. Give the morfessor evaluation tool a list of "gold standard"
-       segmentations and evaluate the words
+"""Evaluation and segmentation classes to be used with trained Infixer models.
+
+The InfixerEvaluation class utilizes some of Morfessor's built-in evaluation
+tools in order to assess the quality of a particular trained model. It can take
+a gold standard file as input and return it with the model's segmentations for
+comparison.
 """
 
 from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import collections
 import logging
 import os.path
 import tempfile
 
-from morfessor.evaluation import EvaluationConfig, MorfessorEvaluation, FORMAT_STRINGS, WilcoxonSignedRank
+from morfessor.evaluation import EvaluationConfig, MorfessorEvaluation, FORMAT_STRINGS
 from morfessor.io import MorfessorIO
 
 from preprocessor import AffixFilter
@@ -31,9 +23,16 @@ _logger = logging.getLogger(__name__)
 
 
 class InfixerEvaluation(object):
+    """An object for evaluating modified Morfessor Baseline segmenters.
+
+    Public functions:
+        evaluate_model
+        return_evaluation
+        output_modified_gold_standard
+    """
 
     def __init__(self, morfessor_model, feature_dict, affix_list):
-        """An object for evaluating modified Morfessor Baseline segmenters.
+        """Initialize an evaluation object with a model, feature dict, and affix list.
 
         :param morfessor_model: a trained Morfessor Baseline object
         :param feature_dict: the output dictionary from ModelBuilder object
@@ -58,6 +57,9 @@ class InfixerEvaluation(object):
         supplied list of affixes and returned.
         """
 
+        # NOTE: leave "redundant parentheses" in return statements,
+        # they are to ensure the output is a tuple
+
         if word in self._feature_dict:
 
             _logger.debug("IN DICT: {} -> {}".format(word, self._feature_dict[word].get('final_word_base', word)))
@@ -75,10 +77,8 @@ class InfixerEvaluation(object):
         segmented) would undergo the same filtering as the training set, to ensure
         continuity.
 
-        Each line has the format:
+        Each line in the segmentation file is expected to have the format:
         <compound> <constr1> <constr2>... <constrN>, <constr1>...<constrN>, ...
-
-        Yield tuples (compound, list(analyses)).
         """
 
         with open(file_name, 'r') as f:
@@ -114,7 +114,7 @@ class InfixerEvaluation(object):
     def evaluate_model(self, gold_standard_file, num_samples=10, sample_size=20):
         """Call the morfessor evaluator.
 
-        :param gold_standard_file:
+        :param gold_standard_file: a file with words and gold standard segmentations
         """
 
         annotations = self._read_annotations_file(gold_standard_file)
@@ -126,7 +126,9 @@ class InfixerEvaluation(object):
     def return_evaluation(self, gold_standard_file, num_samples=10, sample_size=20):
         """Call the morfessor evaluator.
 
-        :param gold_standard_file:
+        :param gold_standard_file: a file with words and gold standard segmentations
+        :param num_samples: the number of samples to be taken
+        :param sample_size: the size of the samples to be taken
         """
 
         annotations = self._read_annotations_file(gold_standard_file)
@@ -134,20 +136,6 @@ class InfixerEvaluation(object):
         results = eval_obj.evaluate_model(self._model, configuration=EvaluationConfig(num_samples, sample_size))
 
         return results
-
-    def segment_word(self, word, separators=('-')):
-        """Segment a given word using a trained morfessor model.
-
-        :param word: the input word string
-        """
-
-        separator = ' '
-        viterbi_smooth = 0
-        viterbi_maxlen = 30
-
-        constructions, _ = self._model.viterbi_segment(word, viterbi_smooth, viterbi_maxlen)
-        constructions_filtered = [item for item in constructions if item not in separators]
-        return separator.join(constructions_filtered)
 
     def _process_segment_file(self, infile):
         """Process a word file to be segmented to ensure compatibility with the model."""
@@ -186,12 +174,85 @@ class InfixerEvaluation(object):
 
         return data_filtered
 
+    def _filter_gold_standard(self, infile):
+        """Process a word file to be segmented to ensure compatibility with the model."""
+
+        with open(infile, 'r') as f:
+            data = f.readlines()
+
+        data_filtered = []
+        for line in data:
+
+            # split word and segmentation
+            word, gold_segmentation = line.split(None, 1)
+
+            # filter empty strings
+            if word == '':
+                continue
+            else:
+                vocab_status, word_filtered = self._update_compounds(word)
+                data_filtered.append((word, vocab_status, word_filtered, gold_segmentation.strip()))
+
+        return data_filtered
+
+    def output_modified_gold_standard(self, gs_infile, outfile):
+        """Process a gold standard file and return it with model-supplied segmentations.
+
+        :param gs_infile: a gold standard file to be processed
+        :param outfile: the file where results should be written to
+        """
+
+        words_filtered = self._filter_gold_standard(gs_infile)
+
+        with open(outfile, 'w') as f:
+
+            for word, vocab_status, word_filtered, gs_segments in words_filtered:
+
+                out_str = '{} {}\n'.format(word_filtered, gs_segments)
+                out_str.encode('utf-8')
+                f.write(out_str)
+
+        _logger.info("Modified gold standard written to {}".format(outfile))
+
+
+class InfixerSegmenter(InfixerEvaluation):
+    """An object that segments input using a trained Infixer model.
+
+    Public functions:
+        segment_word
+        segment_file
+        segment_gold_standard
+    """
+
+    def __init__(self, morfessor_model, feature_dict, affix_list):
+
+        InfixerEvaluation.__init__(self, morfessor_model, feature_dict, affix_list)
+
+    def segment_word(self, word, separators=None):
+        """Segment a given word using a trained morfessor model.
+
+        :param word: the input word string
+        :param separators: a list of punctuation used to separate words (for filtering)
+        """
+
+        # set a default here to avoid issues with mutables in argument list
+        if separators is None:
+            separators = ['-']
+
+        const_separator = ' '
+        viterbi_smooth = 0
+        viterbi_max_len = 30
+
+        constructions, _ = self._model.viterbi_segment(word, viterbi_smooth, viterbi_max_len)
+        constructions_filtered = [item for item in constructions if item not in separators]
+        return const_separator.join(constructions_filtered)
+
     def segment_file(self, infile, outfile, separator=','):
         """Segment an input file and write to an outfile.
 
-        :param infile:
-        :param outfile:
-        :param separator:
+        :param infile: an input file containing words to be segmented
+        :param outfile: a filename for writing output
+        :param separator: the separator for output lines, defaults to ',' mimicking csv
         """
 
         words_filtered = self._filter_input_list(infile)
@@ -212,49 +273,12 @@ class InfixerEvaluation(object):
 
             _logger.info('Segmentations written to {}'.format(outfile))
 
-    def _filter_gold_standard(self, infile):
-        """Process a word file to be segmented to ensure compatibility with the model."""
-
-        with open(infile, 'r') as f:
-            # data = f.read().split('\n')
-            data = f.readlines()
-
-        data_filtered = []
-        for line in data:
-
-            # split word and segmentation
-            # print(line)
-            word, gold_segmentation = line.split(None, 1)
-
-            # filter empty strings
-            if word == '':
-                continue
-            else:
-                vocab_status, word_filtered = self._update_compounds(word)
-                data_filtered.append((word, vocab_status, word_filtered, gold_segmentation.strip()))
-
-        return data_filtered
-
-    def output_modified_gold_standard(self, gs_infile, outfile):
-
-        words_filtered = self._filter_gold_standard(gs_infile)
-
-        with open(outfile, 'w') as f:
-
-            for word, vocab_status, word_filtered, gs_segments in words_filtered:
-
-                out_str = '{} {}\n'.format(word_filtered, gs_segments)
-                out_str.encode('utf-8')
-                f.write(out_str)
-
-        _logger.info("Modified gold standard written to {}".format(outfile))
-
     def segment_gold_standard(self, gs_infile, outfile, separator=','):
-        """Segment an input file and write to an outfile.
+        """Segment an input gold standard file and write to an outfile.
 
-        :param gs_infile:
-        :param outfile:
-        :param separator:
+        :param gs_infile: a gold standard file to be processed
+        :param outfile: the file where results should be written to
+        :param separator: the separator for output lines, defaults to ',' mimicking csv
         """
 
         words_filtered = self._filter_gold_standard(gs_infile)
@@ -271,7 +295,6 @@ class InfixerEvaluation(object):
                          'sep': separator}
 
                 out_str = '{word}{sep}{status}{sep}{filtered}{sep}{gs_segments}{sep}{segments}\n'.format(**items)
-
                 f.write(out_str)
 
-            _logger.info('Segmentations (gold standard) written to {}'.format(outfile))
+        _logger.info('Segmentations (gold standard) written to {}'.format(outfile))
