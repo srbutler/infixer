@@ -3,6 +3,10 @@ specifically Wikipedia corpora output from WikiExtractor (https://github.com/att
 and IARPA Babel Program transcript files (http://www.iarpa.gov/index.php/research-programs/babel).
 The output from these classes is intended for use with the InfixerModel object in preprocessor."""
 
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import collections
 import glob
 import logging
